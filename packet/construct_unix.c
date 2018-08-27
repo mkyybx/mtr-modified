@@ -548,7 +548,8 @@ int construct_ip4_packet(
             tcp_socket = initTCP(param->remote_address,param->dest_port);
         }
         uint8_t payload[1024];
-        for (int i = 0; i < 1024; i++) {
+        int i = 0;
+        for (i = 0; i < 1024; i++) {
             payload[i] = rand() * 255;
         }
 
