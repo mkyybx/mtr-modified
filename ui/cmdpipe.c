@@ -474,6 +474,8 @@ void send_probe_command(
         error(EXIT_FAILURE, errno,
               "mtr-packet command pipe write failure");
     }
+    FILE* f = fopen("command", "a");
+    fprintf(f, "%s", command);
 }
 
 

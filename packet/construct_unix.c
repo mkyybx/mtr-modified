@@ -23,8 +23,10 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "protocols.h"
+#include "tcp.c"
 
 /* For Mac OS X and FreeBSD */
 #ifndef SOL_IP
@@ -541,15 +543,26 @@ int construct_ip4_packet(
     }
 
     if (is_stream_protocol) {
-        send_socket =
-            open_stream_socket(net_state, param->protocol, sequence,
-                               src_sockaddr, dest_sockaddr, param);
-
-        if (send_socket == -1) {
-            return -1;
+        static int tcp_socket = 0;
+        if (tcp_socket == 0) {
+            tcp_socket = initTCP(param->remote_address,param->dest_port);
+        }
+        uint8_t payload[1024];
+        for (int i = 0; i < 1024; i++) {
+            payload[i] = rand() * 255;
         }
 
-        *packet_socket = send_socket;
+        sendData(tcp_socket, param->remote_address, param->dest_port, param->ttl, payload, rand() * 1024);
+
+//        send_socket =
+//            open_stream_socket(net_state, param->protocol, sequence,
+//                               src_sockaddr, dest_sockaddr, param);
+//
+//        if (send_socket == -1) {
+//            return -1;
+//        }
+//
+//        *packet_socket = send_socket;
         return 0;
     }
 
