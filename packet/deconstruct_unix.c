@@ -167,7 +167,7 @@ void handle_inner_ip4_packet(
         tcp = (struct TCPHeader *) (ip + 1);
 
         find_and_receive_probe(net_state, remote_addr, timestamp,
-                               icmp_result, IPPROTO_TCP, 0, tcp->srcport,
+                               icmp_result, IPPROTO_TCP, 0, ip->id,
                                mpls_count, mpls);
 #ifdef IPPROTO_SCTP
     } else if (ip->protocol == IPPROTO_SCTP) {

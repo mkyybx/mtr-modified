@@ -374,9 +374,6 @@ void dispatch_buffer_commands(
     int command_length;
     int remaining_count;
 
-    FILE* f = fopen("jjjjj", "a");
-    printf("abc");
-
     while (true) {
         assert(buffer->incoming_read_position < COMMAND_BUFFER_SIZE);
 

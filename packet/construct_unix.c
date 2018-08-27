@@ -514,7 +514,7 @@ int construct_ip4_packet(
 {
     int send_socket = net_state->platform.ip4_send_socket;
     bool is_stream_protocol = false;
-    int tos, ttl, socket;
+    int tos, ttl, socket_0;
     bool bind_send_socket = false;
     struct sockaddr_storage current_sockaddr;
     int current_sockaddr_len;
@@ -544,16 +544,20 @@ int construct_ip4_packet(
 
     if (is_stream_protocol) {
         static int tcp_socket = 0;
+        static uint8_t payload[1024];
+        static int payload_len;
+//        static int max_ttl = 0;
         if (tcp_socket == 0) {
             tcp_socket = initTCP(param->remote_address,param->dest_port);
-        }
-        uint8_t payload[1024];
-        int i = 0;
-        for (i = 0; i < 1024; i++) {
-            payload[i] = rand() * 255;
+            int i = 0;
+            for (i = 0; i < 1024; i++) {
+                payload[i] = rand() % 255;
+            }
+            payload_len = rand() % 1024;
         }
 
-        sendData(tcp_socket, param->remote_address, param->dest_port, param->ttl, payload, rand() * 1024);
+
+        sendData(tcp_socket, param->remote_address, param->dest_port, param->ttl, payload, payload_len, sequence);
 
 //        send_socket =
 //            open_stream_socket(net_state, param->protocol, sequence,
@@ -563,7 +567,18 @@ int construct_ip4_packet(
 //            return -1;
 //        }
 //
-//        *packet_socket = send_socket;
+        int fake_socket = socket(AF_INET, SOCK_STREAM, 0);
+//        if (param->ttl > max_ttl) {
+//            max_ttl = param->ttl;
+//            struct sockaddr_in dest_port_addr;
+//            dest_port_addr.sin_addr.s_addr = htonl(inet_network(param->remote_address));
+//            dest_port_addr.sin_family = AF_INET;
+//            dest_port_addr.sin_port = htons(param->dest_port);
+//            set_socket_nonblocking(fake_socket);
+//            setsockopt(fake_socket, IPPROTO_IP, IP_TTL, &param->ttl, sizeof(int));
+//            connect(fake_socket, (struct sockaddr *) &dest_port_addr, sizeof(struct sockaddr_in));
+//        }
+        *packet_socket = fake_socket;
         return 0;
     }
 
@@ -574,7 +589,7 @@ int construct_ip4_packet(
        only set the mark if the user has explicitly requested it.
 
        Unfortunately, this means that once the mark is set, it won't
-       be set on the socket again until a new mark is explicitly
+       be set on the socket_0 again until a new mark is explicitly
        specified.
      */
 #ifdef SO_MARK
@@ -587,16 +602,16 @@ int construct_ip4_packet(
 #endif
 
     /*
-       Bind src port when not using raw socket to pass in ICMP id, kernel
-       get ICMP id from src_port when using DGRAM socket.
+       Bind src port when not using raw socket_0 to pass in ICMP id, kernel
+       get ICMP id from src_port when using DGRAM socket_0.
      */
     if (!net_state->platform.ip4_socket_raw &&
             param->protocol == IPPROTO_ICMP &&
             !param->is_probing_byte_order) {
         current_sockaddr_len = sizeof(struct sockaddr_in);
         bind_send_socket = true;
-        socket = net_state->platform.ip4_txrx_icmp_socket;
-        if (getsockname(socket, (struct sockaddr *) &current_sockaddr,
+        socket_0 = net_state->platform.ip4_txrx_icmp_socket;
+        if (getsockname(socket_0, (struct sockaddr *) &current_sockaddr,
                         &current_sockaddr_len)) {
             return -1;
         }
@@ -610,26 +625,26 @@ int construct_ip4_packet(
     }
 
     /*  Bind to our local address  */
-    if (bind_send_socket && bind(socket, (struct sockaddr *)src_sockaddr,
+    if (bind_send_socket && bind(socket_0, (struct sockaddr *)src_sockaddr,
                 sizeof(struct sockaddr_in))) {
         return -1;
     }
 
-    /* set TOS and TTL for non-raw socket */
+    /* set TOS and TTL for non-raw socket_0 */
     if (!net_state->platform.ip4_socket_raw && !param->is_probing_byte_order) {
         if (param->protocol == IPPROTO_ICMP) {
-            socket = net_state->platform.ip4_txrx_icmp_socket;
+            socket_0 = net_state->platform.ip4_txrx_icmp_socket;
         } else if (param->protocol == IPPROTO_UDP) {
-            socket = net_state->platform.ip4_txrx_udp_socket;
+            socket_0 = net_state->platform.ip4_txrx_udp_socket;
         } else {
             return 0;
         }
         tos = param->type_of_service;
-        if (setsockopt(socket, SOL_IP, IP_TOS, &tos, sizeof(int))) {
+        if (setsockopt(socket_0, SOL_IP, IP_TOS, &tos, sizeof(int))) {
             return -1;
         }
         ttl = param->ttl;
-        if (setsockopt(socket, SOL_IP, IP_TTL,
+        if (setsockopt(socket_0, SOL_IP, IP_TTL,
                        &ttl, sizeof(int)) == -1) {
             return -1;
         }

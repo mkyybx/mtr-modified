@@ -874,7 +874,7 @@ void receive_replies_from_probe_socket(
     /*
        If the socket is writable, the connection attempt has completed.
      */
-    if (!FD_ISSET(probe_socket, &write_set)) {
+    if (/*!FD_ISSET(probe_socket, &write_set)*/1) {
         return;
     }
 

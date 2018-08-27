@@ -77,7 +77,9 @@ int initRawSocket(int protocol) {
     return sock;
 }
 
-void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort, uint16_t srcPort, uint8_t ttl, uint32_t seq, uint32_t ack_seq, uint8_t* payload, int payload_len) {
+void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort,
+                  uint16_t srcPort, uint8_t ttl, uint32_t seq, uint32_t ack_seq,
+                  uint8_t* payload, int payload_len, uint16_t ip_id) {
     int bytes  = 1;
     struct iphdr *ipHdr;
     struct tcphdr *tcpHdr;
@@ -117,7 +119,7 @@ void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort, uint1
     ipHdr->version = 4; // ipv4
     ipHdr->tos = 0;// //tos = [0:5] DSCP + [5:7] Not used, low delay
     ipHdr->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + strlen(data); //total lenght of packet. len(data) = 0
-    ipHdr->id = htons(rand() * UINT16_MAX); // 0x00; //16 bit id
+    ipHdr->id = htons(ip_id); // 0x00; //16 bit id
     ipHdr->frag_off = 0x40; //16 bit field = [0:2] flags + [3:15] offset = 0x0
     ipHdr->ttl = ttl; //16 bit time to live (or maximal number of hops)
     ipHdr->protocol = IPPROTO_TCP; //TCP protocol
@@ -127,7 +129,7 @@ void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort, uint1
 
     //Now we can calculate the check sum for the IP header check field
     ipHdr->check = csum((unsigned short *) packet, ipHdr->tot_len);
-    printf("IP header checksum: %d\n\n\n", ipHdr->check);
+//    printf("IP header checksum: %d\n\n\n", ipHdr->check);
 
     //Populate tcpHdr
     tcpHdr->source = htons(srcPort); //16 bit in nbp format of source port
@@ -142,7 +144,7 @@ void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort, uint1
     tcpHdr->ece = 0; //Congestion control mechanism
     tcpHdr->urg = 0; //Urgent flag
     tcpHdr->ack = 1; //Acknownledge
-    tcpHdr->psh = 1; //Push data immediately
+    tcpHdr->psh = 0; //Push data immediately
     tcpHdr->rst = 0; //RST flag
     tcpHdr->syn = 0; //SYN flag
     tcpHdr->fin = 0; //Terminates the connection
@@ -186,7 +188,7 @@ void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort, uint1
             perror("Error on sendto()");
         }
         else {
-            printf("Success! Sent %d bytes.\n", bytes);
+//            printf("Success! Sent %d bytes.\n", bytes);
         }
 
 //        printf("SEQ guess: %u\n\n", initSeqGuess);
@@ -205,7 +207,7 @@ void * interceptACK(void *pVoid) {
     socklen_t len0 = sizeof(struct sockaddr);
     while (1) {
         recvfrom(raw_sock_rx, recvbuf, 3000, 0, &recvaddr, &len0);
-        if (((struct iphdr*)recvbuf)->saddr == inet_addr("123.125.115.110")) {
+        if (((struct iphdr*)recvbuf)->saddr == inet_addr((char*)pVoid)) {
             struct tcphdr *ptr = (struct tcphdr *) (recvbuf + sizeof(struct iphdr));
             seq_1 = ptr->ack_seq;
             ack_seq_1 = htonl((ntohl(ptr->seq) + 1));
@@ -226,7 +228,7 @@ extern int initTCP(const char* ipaddr, uint16_t port) {
 
     pthread_t t1;
     pthread_attr_t t2;
-    pthread_create(&t1,0,interceptACK,0);
+    pthread_create(&t1,0,interceptACK,ipaddr);
 
     if (connect (stream_socket, (struct sockaddr *) &dest_port_addr, sizeof(struct sockaddr_in)))
         exit(-1);
@@ -234,13 +236,16 @@ extern int initTCP(const char* ipaddr, uint16_t port) {
     return stream_socket;
 }
 
-extern int sendData(int stream_socket, const char* ipaddr, uint16_t port, uint8_t ttl, uint8_t* payload, int payload_len) {
+extern int sendData(int stream_socket, const char* ipaddr, uint16_t port,
+                    uint8_t ttl, uint8_t* payload, int payload_len, uint16_t ip_id) {
 
     struct sockaddr_in src_port_addr;
     socklen_t len = sizeof(src_port_addr);
     getsockname(stream_socket, (struct sockaddr *)&src_port_addr, &len);
-    while(seq_1 == 0);
-    sendIpPacket(raw_sock_tx, src_port_addr.sin_addr.s_addr, ipaddr, 80, htons(src_port_addr.sin_port), ttl, seq_1, ack_seq_1, payload, payload_len);
+//    while(seq_1 == 0);
+
+    sendIpPacket(raw_sock_tx, src_port_addr.sin_addr.s_addr, ipaddr, port, htons(src_port_addr.sin_port), ttl, seq_1, ack_seq_1, payload, payload_len, ip_id);
+
 
 
 
