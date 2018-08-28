@@ -221,14 +221,14 @@ void execute_packet_child(
      */
     char *mtr_packet_path = getenv("MTR_PACKET");
     if (mtr_packet_path == NULL) {
-        mtr_packet_path = "mtr-packet";
+        mtr_packet_path = "./mtr-packet";
     }
 
     /*
        First, try to execute mtr-packet from PATH
        or MTR_PACKET environment variable.
      */
-    execlp(mtr_packet_path, "mtr-packet", (char *) NULL);
+    execlp(mtr_packet_path, "./mtr-packet", (char *) NULL);
 
     /* 
        Then try to find it where WE were executed from.  
@@ -236,7 +236,7 @@ void execute_packet_child(
     strncpy (buf, myname, 240);
     strcat (buf, "-packet");
     mtr_packet_path = buf;
-    execl(mtr_packet_path, "mtr-packet", (char *) NULL);
+    execl(mtr_packet_path, "./mtr-packet", (char *) NULL);
 
     /*
        If mtr-packet is not found, try to use mtr-packet from current directory
