@@ -82,10 +82,10 @@ int main(
        raw sockets.
      */
     init_net_state_privileged(&net_state);
-    if (drop_elevated_permissions()) {
-        perror("Unable to drop elevated permissions");
-        exit(EXIT_FAILURE);
-    }
+//    if (drop_elevated_permissions()) {
+//        perror("Unable to drop elevated permissions");
+//        exit(EXIT_FAILURE);
+//    }
     init_net_state(&net_state);
 
     init_command_buffer(&command_buffer, fileno(stdin));
