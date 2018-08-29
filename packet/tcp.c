@@ -208,10 +208,13 @@ void * interceptACK(void *pVoid) {
     while (1) {
         recvfrom(raw_sock_rx, recvbuf, 3000, 0, &recvaddr, &len0);
         if (((struct iphdr*)recvbuf)->saddr == inet_addr((char*)pVoid)) {
-            struct tcphdr *ptr = (struct tcphdr *) (recvbuf + sizeof(struct iphdr));
-            seq_1 = ptr->ack_seq;
-            ack_seq_1 = htonl((ntohl(ptr->seq) + 1));
-            break;
+            struct tcphdr* tcpHeader = ((struct iphdr*)recvbuf) + 1;
+            if (tcpHeader->syn == 1) {
+                struct tcphdr *ptr = (struct tcphdr *) (recvbuf + sizeof(struct iphdr));
+                seq_1 = ptr->ack_seq;
+                ack_seq_1 = htonl((ntohl(ptr->seq) + 1));
+                break;
+            }
         }
     }
 }
