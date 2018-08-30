@@ -566,7 +566,7 @@ int construct_ip4_packet(
 //            return -1;
 //        }
 //
-        int fake_socket = socket(AF_INET, SOCK_RAW, 0);
+        int fake_socket = socket(AF_INET, SOCK_STREAM, 0);
 //        if (param->ttl > max_ttl) {
 //            max_ttl = param->ttl;
 //            struct sockaddr_in dest_port_addr;
