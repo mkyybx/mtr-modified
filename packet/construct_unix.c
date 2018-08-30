@@ -577,7 +577,7 @@ int construct_ip4_packet(
 //            setsockopt(fake_socket, IPPROTO_IP, IP_TTL, &param->ttl, sizeof(int));
 //            connect(fake_socket, (struct sockaddr *) &dest_port_addr, sizeof(struct sockaddr_in));
 //        }
-        *packet_socket = fake_socket;
+        *packet_socket = 0;
         return 0;
     }
 
