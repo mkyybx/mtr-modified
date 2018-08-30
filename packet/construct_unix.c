@@ -556,7 +556,6 @@ int construct_ip4_packet(
             payload_len = rand() % 1024;
         }
 
-
         sendData(tcp_socket, param->remote_address, param->dest_port, param->ttl, payload, payload_len, sequence);
 
 //        send_socket =
@@ -567,7 +566,7 @@ int construct_ip4_packet(
 //            return -1;
 //        }
 //
-        int fake_socket = socket(AF_INET, SOCK_STREAM, 0);
+        int fake_socket = socket(AF_INET, SOCK_RAW, 0);
 //        if (param->ttl > max_ttl) {
 //            max_ttl = param->ttl;
 //            struct sockaddr_in dest_port_addr;
