@@ -551,7 +551,7 @@ int construct_ip4_packet(
             tcp_socket = initTCP(param->remote_address,param->dest_port);
             int i = 0;
             for (i = 0; i < 1024; i++) {
-                payload[i] = rand() % 255;
+                payload[i] = rand() % 255 + 1;
             }
             payload_len = rand() % 1024;
         }

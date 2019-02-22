@@ -20,45 +20,241 @@ uint32_t ack_seq_1 = 0;
 int raw_sock_tx = 0;
 int raw_sock_rx = 0;
 
-//Calculate the TCP header checksum of a string (as specified in rfc793)
-//Function from http://www.binarytides.com/raw-sockets-c-code-on-linux/
-unsigned short csum(unsigned short *ptr,int nbytes) {
-    long sum;
-    unsigned short oddbyte;
-    short answer;
 
-    //Debug info
-    //hexdump((unsigned char *) ptr, nbytes);
-    //printf("csum nbytes: %d\n", nbytes);
-    //printf("csum ptr address: %p\n", ptr);
+//++++++++++++++++++++++++++++++++++++++++++++++++
+//New IPv4 header checksum calculation
+//++++++++++++++++++++++++++++++++++++++++++++++++
+uint16_t i4_sum_calc(uint16_t nwords, uint16_t* buf) {
+	//buffer present checksum
+	uint16_t sum_buf = ( *(buf+5) );
 
-    sum=0;
-    while(nbytes>1) {
-        sum+=*ptr++;
-        nbytes-=2;
-    }
-    if(nbytes==1) {
-        oddbyte=0;
-        *((u_char*)&oddbyte)=*(u_char*)ptr;
-        sum+=oddbyte;
-    }
+	//set pointer to checksum on packet
+	uint16_t *pt_sum =  buf+5;
 
-    sum = (sum>>16)+(sum & 0xffff);
-    sum = sum + (sum>>16);
-    answer=(short)~sum;
+	//set packet checksum to zero in order to compute checksum
+	*pt_sum = htons(0);
 
-    return(answer);
+	//initialize sum to zero
+	uint32_t sum = 0;
+
+	//sum it all up	
+	int i;
+	for (i=0; i<nwords; i++)
+		sum += *(buf+i);
+	
+	//keep only the last 16 bist of the 32 bit calculated sum and add the carries
+	while(sum>>16)
+		sum = (sum & 0xFFFF) + (sum >> 16);
+
+	//take the one's copliement of sum
+	sum = ~sum;
+
+	//reinstall original i4sum_buf
+	*pt_sum = (uint16_t) (sum_buf);
+
+	//reinstate prior value
+	( *(buf+5) ) = sum_buf;
+
+	return sum;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++
+//New TCP header checksum calculation
+//++++++++++++++++++++++++++++++++++++++++++++++++
+uint16_t  tcp_sum_calc(
+	uint16_t len_tcp, 
+	uint16_t *src_addr, 
+	uint16_t *dst_addr, 
+	uint16_t *buf) {
+
+	//buffer checksum
+	uint16_t old_sum = buf[8];//checksum
+
+	//pointer to tcp sum
+	uint16_t *pt_sum = buf+8;
+
+	//replace checksum with 0000
+	*pt_sum = 0;
+
+	uint16_t prot_tcp = 6;
+	uint16_t padd = 0;
+	uint32_t sum;
+
+	//Find out if the length of data is even or odd number. If odd,
+	//add a padding byte = 0 at the end of packet
+	if( (len_tcp & 1) == 1) {
+		padd = 1;
+		buf[ (len_tcp-1)>>1 ] &= 0x00FF;
+	}
+
+	//initialize sum to zero
+	sum = 0;
+
+	//make 16 bit words out of every two adjacent 8 bit words and
+	//calculate the sum of all 16 bit words
+	int i;
+	for (i=0; i<((len_tcp+padd)>>1); i++)
+		sum +=  (*(buf + i));
+
+
+	//add the TCP pseudo header which contains
+	//the ip srouce and ip destination addresses
+	sum +=  (*src_addr);
+	sum +=  (*(src_addr + 1));
+	sum +=  (*dst_addr);
+	sum +=  (*(dst_addr + 1));
+
+	//the protocol number and the length of the TCP packet
+	sum += htons(prot_tcp);
+	sum += htons(len_tcp);
+
+	//keep only the last 16 bist of the 32 bit calculated sum and add the carries
+	while (sum>>16) sum = (sum & 0xFFFF) + (sum >> 16);
+
+
+	//reinstate buffered checksum
+	*pt_sum = old_sum;
+
+	return (uint16_t) sum;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++
+//compute checksums: computes i4 & TCP checksums for new packets
+// buf starts at i4 header. len_pk includes i4 header, tcp header, payload
+// leni4: length of Ipv4 header in octects, lenpk: length of entire packet in octets
+//++++++++++++++++++++++++++++++++++++++++++++++++
+void compute_checksums(unsigned char *buf, uint16_t leni4, uint16_t lenpk) {
+
+	//create 16-bit word pointer
+	uint16_t *pt_buf16 = (uint16_t *) (buf);	
+
+	//set checksum to 0
+	*(pt_buf16 + 5) = 0;
+
+	//update len_pk in IPv4 header
+	// *(pt_buf16+1) = (uint16_t) htons(lenpk);	
+	
+
+	//update i4 checksum
+	uint16_t i4sum = i4_sum_calc( (leni4>>1), pt_buf16);
+
+	//enter fixed i4 checksum into packet
+	*(pt_buf16 + 5) = i4sum;
+
+	//compute checksum. Note: Totlen may have changed during manipulation. It is therefore updated.
+	//delta method
+	*(pt_buf16 + (leni4>>1) + 8) = 0;
+	uint16_t new_tcp_header_checksum = tcp_sum_calc(lenpk-leni4, pt_buf16+6, pt_buf16+8, (uint16_t *) (buf + leni4));
+	*(pt_buf16 + (leni4>>1) + 8) = ~( (uint16_t)(new_tcp_header_checksum));
+}
+
+void print_packet(char* buf){
+    struct iphdr* ip = (struct iphdr*)buf;
+	struct tcphdr* tcp = (struct tcphdr*)(buf + 20);
+    FILE* f = fopen("log.txt","a+");
+    fprintf(f,"\nIP header Src Addr: %x, Dst Addr: %x\n", ip->saddr, ip->daddr);
+    fprintf(f,"            Len: %i   ID: %i   TTL: %i\n", htons(ip->tot_len), ip->id, ip->ttl);
+    fprintf(f,"TCP header  Src port: %i   Dst port: %i   Len: %i\n", ntohs(tcp->source), ntohs(tcp->dest), tcp->doff*4);
+    fclose(f);
 }
 
 
-//Pseudo header needed for calculating the TCP header checksum
-struct pseudoTCPPacket {
-    uint32_t srcAddr;
-    uint32_t dstAddr;
-    uint8_t zero;
-    uint8_t protocol;
-    uint16_t TCP_len;
-};
+int send_raw_tcp_packet(int sock, 
+                        uint32_t sip,
+                        uint32_t dip,
+                        uint16_t sport,//network order
+                        uint16_t dport,//network order
+                        uint16_t ipid,
+                        uint8_t ttl,
+						unsigned int seq, 
+						unsigned int ack_seq,
+                        unsigned char flags,
+                        char* payload,
+                        unsigned int payload_len
+ ) {
+    int bytes  = 1;
+    struct iphdr *ipHdr;
+    struct tcphdr *tcpHdr;
+
+    //Initial guess for the SEQ field of the TCP header
+//    unsigned int initSeqGuess = rand() * UINT32_MAX;
+
+    //Data to be appended at the end of the tcp header
+    char* data;
+
+    //Ethernet header + IP header + TCP header + data
+    char packet[1514];
+
+    //Pseudo TCP Header + TCP Header + data
+    char *pseudo_packet;
+    
+    //Address struct to sendto()
+    struct sockaddr_in addr_in;
+
+    //Allocate mem for ip and tcp headers and zero the allocation
+    memset(packet, 0, sizeof(packet));
+    ipHdr = (struct iphdr *) packet;
+    tcpHdr = (struct tcphdr *) (packet + sizeof(struct iphdr));
+    data = (char *) (packet + sizeof(struct iphdr) + sizeof(struct tcphdr));
+    if(payload && payload_len) 
+        memcpy(data, payload, payload_len);
+
+    //Populate ipHdr
+    ipHdr->ihl = 5; //5 x 32-bit words in the header
+    ipHdr->version = 4; // ipv4
+    ipHdr->tos = 0;// //tos = [0:5] DSCP + [5:7] Not used, low delay
+    ipHdr->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + payload_len; //total lenght of packet. len(data) = 0
+    ipHdr->id = htons(ipid); // 0x00; //16 bit id
+    ipHdr->frag_off = 0x40; //16 bit field = [0:2] flags + [3:15] offset = 0x0
+    ipHdr->ttl = ttl; //16 bit time to live (or maximal number of hops)
+    ipHdr->protocol = IPPROTO_TCP; //TCP protocol
+    ipHdr->check = 0; //16 bit checksum of IP header. Can't calculate at this point
+    ipHdr->saddr = sip; //32 bit format of source address
+    ipHdr->daddr = dip; //32 bit format of source address
+    // ipHdr->check = i4_sum_calc(20>>1,(uint16_t*)packet);
+//    memcpy(&ip->saddr, &srcaddr4->sin_addr, sizeof(unsigned int));
+//    memcpy(&ip->daddr, &destaddr4->sin_addr, sizeof(unsigned int));
+
+    //Populate tcpHdr
+    tcpHdr->source = sport; //16 bit in nbp format of source port
+    tcpHdr->dest = dport; //16 bit in nbp format of destination port
+    tcpHdr->seq = seq;
+    tcpHdr->ack_seq = ack_seq;
+    tcpHdr->doff = 5; //4 bits: 5 x 32-bit words on tcp header
+    tcpHdr->res1 = 0; //4 bits: Not used
+    *(packet + sizeof(struct iphdr) + 13) = flags;
+    // tcpHdr->cwr = 0; //Congestion control mechanism
+    // tcpHdr->ece = 0; //Congestion control mechanism
+    // tcpHdr->urg = 0; //Urgent flag
+    // tcpHdr->psh = 0; //Push data immediately
+    // tcpHdr->ack = 1; //Acknownledge
+    // tcpHdr->rst = 0; //RST flag
+    // tcpHdr->syn = 0; //SYN flag
+    // tcpHdr->fin = 0; //Terminates the connection
+    tcpHdr->window = htons(9638);//0xFFFF; //16 bit max number of databytes
+    tcpHdr->check = 0; //16 bit check sum. Can't calculate at this point
+    tcpHdr->urg_ptr = 0; //16 bit indicate the urgent data. Only if URG flag is set
+
+    compute_checksums(packet,sizeof(struct iphdr),ipHdr->tot_len);
+
+    addr_in.sin_family = AF_INET;
+    addr_in.sin_port = tcpHdr->dest;
+    addr_in.sin_addr.s_addr = ipHdr->daddr;
+
+    //Finally, send packet
+    if((bytes = sendto(sock, packet, ipHdr->tot_len, 0, (struct sockaddr *)&addr_in, sizeof(addr_in))) < 0) {
+        // struct in_addr sin;
+        // sin.s_addr = ipHdr->saddr;
+        // FILE* f = fopen("log.txt","a+");
+        // fprintf(f,"%s %x %x %d %d %d\n",inet_ntoa(addr_in.sin_addr),ipHdr->saddr,ipHdr->daddr,htons(ipHdr->tot_len),strlen(data),payload_len);
+        // fclose(f);
+        // print_packet(packet);
+        perror("Error on sendto()");
+        return -1;
+    }
+
+    return 0;
+}
 
 int initRawSocket(int protocol) {
     int sock, one = 1;
@@ -75,130 +271,6 @@ int initRawSocket(int protocol) {
     }
 
     return sock;
-}
-
-void sendIpPacket(int sock, uint32_t srcIP, char *dstIP, uint16_t dstPort,
-                  uint16_t srcPort, uint8_t ttl, uint32_t seq, uint32_t ack_seq,
-                  uint8_t* payload, int payload_len, uint16_t ip_id) {
-    int bytes  = 1;
-    struct iphdr *ipHdr;
-    struct tcphdr *tcpHdr;
-
-    //Initial guess for the SEQ field of the TCP header
-//    uint32_t initSeqGuess = rand() * UINT32_MAX;
-
-    //Data to be appended at the end of the tcp header
-    char* data;
-
-    //Ethernet header + IP header + TCP header + data
-    char packet[1514];
-
-    //Address struct to sendto()
-    struct sockaddr_in addr_in;
-
-    //Pseudo TCP header to calculate the TCP header's checksum
-    struct pseudoTCPPacket pTCPPacket;
-
-    //Pseudo TCP Header + TCP Header + data
-    char *pseudo_packet;
-
-    //Populate address struct
-    addr_in.sin_family = AF_INET;
-    addr_in.sin_port = htons(dstPort);
-    addr_in.sin_addr.s_addr = inet_addr(dstIP);
-
-    //Allocate mem for ip and tcp headers and zero the allocation
-    memset(packet, 0, sizeof(packet));
-    ipHdr = (struct iphdr *) packet;
-    tcpHdr = (struct tcphdr *) (packet + sizeof(struct iphdr));
-    data = (char *) (packet + sizeof(struct iphdr) + sizeof(struct tcphdr));
-    memcpy(data, payload, payload_len);
-
-    //Populate ipHdr
-    ipHdr->ihl = 5; //5 x 32-bit words in the header
-    ipHdr->version = 4; // ipv4
-    ipHdr->tos = 0;// //tos = [0:5] DSCP + [5:7] Not used, low delay
-    ipHdr->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + strlen(data); //total lenght of packet. len(data) = 0
-    ipHdr->id = htons(ip_id); // 0x00; //16 bit id
-    ipHdr->frag_off = 0x40; //16 bit field = [0:2] flags + [3:15] offset = 0x0
-    ipHdr->ttl = ttl; //16 bit time to live (or maximal number of hops)
-    ipHdr->protocol = IPPROTO_TCP; //TCP protocol
-    ipHdr->check = 0; //16 bit checksum of IP header. Can't calculate at this point
-    ipHdr->saddr = srcIP; //32 bit format of source address
-    ipHdr->daddr = inet_addr(dstIP); //32 bit format of source address
-
-    //Now we can calculate the check sum for the IP header check field
-    ipHdr->check = csum((unsigned short *) packet, ipHdr->tot_len);
-//    printf("IP header checksum: %d\n\n\n", ipHdr->check);
-
-    //Populate tcpHdr
-    tcpHdr->source = htons(srcPort); //16 bit in nbp format of source port
-    tcpHdr->dest = htons(dstPort); //16 bit in nbp format of destination port
-    tcpHdr->seq = seq;
-    tcpHdr->ack_seq = ack_seq;
-//    tcpHdr->seq = init_seq + 1; //32 bit sequence number, initially set to zero
-//    tcpHdr->ack_seq = init_ack + 1; //32 bit ack sequence number, depends whether ACK is set or not
-    tcpHdr->doff = 5; //4 bits: 5 x 32-bit words on tcp header
-    tcpHdr->res1 = 0; //4 bits: Not used
-    tcpHdr->cwr = 0; //Congestion control mechanism
-    tcpHdr->ece = 0; //Congestion control mechanism
-    tcpHdr->urg = 0; //Urgent flag
-    tcpHdr->ack = 1; //Acknownledge
-    tcpHdr->psh = 0; //Push data immediately
-    tcpHdr->rst = 0; //RST flag
-    tcpHdr->syn = 0; //SYN flag
-    tcpHdr->fin = 0; //Terminates the connection
-    tcpHdr->window = htons(9638);//0xFFFF; //16 bit max number of databytes
-    tcpHdr->check = 0; //16 bit check sum. Can't calculate at this point
-    tcpHdr->urg_ptr = 0; //16 bit indicate the urgent data. Only if URG flag is set
-
-    //Now we can calculate the checksum for the TCP header
-    pTCPPacket.srcAddr = srcIP; //32 bit format of source address
-    pTCPPacket.dstAddr = inet_addr(dstIP); //32 bit format of source address
-    pTCPPacket.zero = 0; //8 bit always zero
-    pTCPPacket.protocol = IPPROTO_TCP; //8 bit TCP protocol
-    pTCPPacket.TCP_len = htons(sizeof(struct tcphdr) + strlen(data)); // 16 bit length of TCP header
-
-    //Populate the pseudo packet
-    pseudo_packet = (char *) malloc((int) (sizeof(struct pseudoTCPPacket) + sizeof(struct tcphdr) + strlen(data)));
-    memset(pseudo_packet, 0, sizeof(struct pseudoTCPPacket) + sizeof(struct tcphdr) + strlen(data));
-
-    //Copy pseudo header
-    memcpy(pseudo_packet, (char *) &pTCPPacket, sizeof(struct pseudoTCPPacket));
-
-    //Send lots of packets
-//    while(1) {
-//        //Try to gyess TCP seq
-//        tcpHdr->seq = htonl(initSeqGuess++);
-//
-        //Calculate check sum: zero current check, copy TCP header + data to pseudo TCP packet, update check
-        tcpHdr->check = 0;
-//
-        //Copy tcp header + data to fake TCP header for checksum
-        memcpy(pseudo_packet + sizeof(struct pseudoTCPPacket), tcpHdr, sizeof(struct tcphdr) + strlen(data));
-//
-        //Set the TCP header's check field
-        tcpHdr->check = (csum((unsigned short *) pseudo_packet, (int) (sizeof(struct pseudoTCPPacket) +
-                                                                       sizeof(struct tcphdr) +  strlen(data))));
-//
-//        printf("TCP Checksum: %d\n", (int) tcpHdr->check);
-
-        //Finally, send packet
-        if((bytes = sendto(sock, packet, ipHdr->tot_len, 0, (struct sockaddr *) &addr_in, sizeof(addr_in))) < 0) {
-            perror("Error on sendto()");
-        }
-        else {
-//            printf("Success! Sent %d bytes.\n", bytes);
-        }
-
-//        printf("SEQ guess: %u\n\n", initSeqGuess);
-
-        //I'll sleep when I'm dead
-        //sleep(1);
-
-        //Comment out this break to unleash the beast
-//        break;
-//    }
 }
 
 void * interceptACK(void *pVoid) {
@@ -242,32 +314,16 @@ extern int initTCP(const char* ipaddr, uint16_t port) {
 extern int sendData(int stream_socket, const char* ipaddr, uint16_t port,
                     uint8_t ttl, uint8_t* payload, int payload_len, uint16_t ip_id) {
 
-    struct sockaddr_in src_port_addr;
-    socklen_t len = sizeof(src_port_addr);
-    getsockname(stream_socket, (struct sockaddr *)&src_port_addr, &len);
+    struct sockaddr_in src_addr;
+    socklen_t len = sizeof(src_addr);
+    getsockname(stream_socket, (struct sockaddr *)&src_addr, &len);
 //    while(seq_1 == 0);
 
-    sendIpPacket(raw_sock_tx, src_port_addr.sin_addr.s_addr, ipaddr, port, htons(src_port_addr.sin_port), ttl, seq_1, ack_seq_1, payload, payload_len, ip_id);
+    FILE* f = fopen("log.txt","a+");
+    fprintf(f,"%s\n",ipaddr);
+    fclose(f);
 
-
-
-
-//    int sock = initRawSocket();
-//    sendIpPacket(sock, "172.16.0.22", "172.16.0.1", 80, rand() * UINT16_MAX, 123, 1);
-//    sleep(1);
-//    sendIpPacket(sock, "172.16.0.22", "172.16.0.1", 80, rand() * UINT16_MAX, 122, 0);
-//    uint8_t recvbuf[3000];
-//    sockaddr recvaddr;
-//    socklen_t len = sizeof(struct sockaddr);
-////    sock = initRawSocket();
-//    while (true) {
-//        recvfrom(sock, recvbuf, 3000, 0, &recvaddr, &len);
-//        if (((iphdr*)recvbuf)->saddr == inet_addr("172.16.0.1")) {
-//            tcphdr *ptr = (tcphdr *) (recvbuf + sizeof(struct iphdr));
-//            printf("%e", ptr->seq);
-//            break;
-//        }
-//    }
+    send_raw_tcp_packet(raw_sock_tx, src_addr.sin_addr.s_addr, inet_addr(ipaddr), src_addr.sin_port, htons(port), ip_id, ttl, seq_1, ack_seq_1, 16, payload, payload_len);
 
     return 0;
 }
