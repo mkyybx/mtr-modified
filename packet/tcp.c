@@ -320,6 +320,9 @@ extern int sendData(int stream_socket, const char* ipaddr, uint16_t port,
 //    while(seq_1 == 0);
 
     FILE* f = fopen("log.txt","a+");
+    if (!f){
+        perror("null file");
+    }
     fprintf(f,"%s\n",ipaddr);
     fclose(f);
 
