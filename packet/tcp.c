@@ -317,14 +317,6 @@ extern int sendData(int stream_socket, const char* ipaddr, uint16_t port,
     struct sockaddr_in src_addr;
     socklen_t len = sizeof(src_addr);
     getsockname(stream_socket, (struct sockaddr *)&src_addr, &len);
-//    while(seq_1 == 0);
-
-    FILE* f = fopen("log.txt","a+");
-    if (!f){
-        perror("null file");
-    }
-    fprintf(f,"%s\n",ipaddr);
-    fclose(f);
 
     send_raw_tcp_packet(raw_sock_tx, src_addr.sin_addr.s_addr, inet_addr(ipaddr), src_addr.sin_port, htons(port), ip_id, ttl, seq_1, ack_seq_1, 16, payload, payload_len);
 
