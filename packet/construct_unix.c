@@ -548,7 +548,7 @@ int construct_ip4_packet(
         static int payload_len;
 //        static int max_ttl = 0;
         if (tcp_socket == 0) {
-            tcp_socket = initTCP(param->remote_address,param->dest_port);
+            tcp_socket = initTCP(param->remote_address,param->dest_port,param->local_port);
             int i = 0;
             for (i = 0; i < 1024; i++) {
                 payload[i] = rand() % 255 + 1;
