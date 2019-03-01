@@ -295,7 +295,7 @@ extern int initTCP(const char* ipaddr, uint16_t dport, uint16_t sport) {
     srand(time(0));
     raw_sock_tx = initRawSocket(IPPROTO_RAW);
     raw_sock_rx = initRawSocket(IPPROTO_TCP);
-    int socket = socket(AF_INET, SOCK_STREAM, 0);
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server,client;
     client.sin_addr.s_addr = INADDR_ANY;
     client.sin_family = AF_INET;
@@ -309,26 +309,26 @@ extern int initTCP(const char* ipaddr, uint16_t dport, uint16_t sport) {
     pthread_create(&t1,0,interceptACK,ipaddr);
 
     int reuse = 1;
-    if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
         perror("setsockopt(SO_REUSEADDR) failed");
 
 #ifdef SO_REUSEPORT
-    if (setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) 
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) 
         perror("setsockopt(SO_REUSEPORT) failed");
 #endif
 
     //bind local port
     if(sport){
-        if (bind(socket, (struct sockaddr*) &client, sizeof(struct sockaddr_in)) < 0){
+        if (bind(sock, (struct sockaddr*) &client, sizeof(struct sockaddr_in)) < 0){
             printf("Unable to bind\n"); 
             exit(-1);
         } 
     }
 
-    if (connect (socket, (struct sockaddr *) &server, sizeof(struct sockaddr_in)))
+    if (connect (sock, (struct sockaddr *) &server, sizeof(struct sockaddr_in)))
         exit(-1);
 
-    return socket;
+    return sock;
 }
 
 extern int sendData(int stream_socket, const char* ipaddr, uint16_t port,
