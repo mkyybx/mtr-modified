@@ -309,17 +309,17 @@ extern int initTCP(const char* ipaddr, uint16_t dport, uint16_t sport) {
     pthread_create(&t1,0,interceptACK,ipaddr);
 
     int reuse = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
+    if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
         perror("setsockopt(SO_REUSEADDR) failed");
 
 #ifdef SO_REUSEPORT
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) 
+    if (setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) 
         perror("setsockopt(SO_REUSEPORT) failed");
 #endif
 
     //bind local port
     if(sport){
-        if (bind(sock, (struct sockaddr*) &client, sizeof(struct sockaddr_in)) < 0){
+        if (bind(socket, (struct sockaddr*) &client, sizeof(struct sockaddr_in)) < 0){
             printf("Unable to bind\n"); 
             exit(-1);
         } 
