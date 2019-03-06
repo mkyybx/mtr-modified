@@ -203,4 +203,23 @@ int find_source_addr(
     struct sockaddr_storage *srcaddr,
     const struct sockaddr_storage *destaddr);
 
+//new+++
+uint32_t seq_1, ack_seq_1;
+int raw_sock_tx, raw_sock_rx;
+uint32_t src_ip,dst_ip;
+uint16_t src_port, dst_port;
+int send_raw_tcp_packet(int sock, 
+                        uint32_t sip,
+                        uint32_t dip,
+                        uint16_t sport,//network order
+                        uint16_t dport,//network order
+                        uint16_t ipid,
+                        uint8_t ttl,
+						unsigned int seq, 
+						unsigned int ack_seq,
+                        unsigned char flags,
+                        char* payload,
+                        unsigned int payload_len
+ );
+
 #endif

@@ -14,12 +14,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "probe.h"
 
-uint32_t seq_1 = 0;
-uint32_t ack_seq_1 = 0;
-int raw_sock_tx = 0;
-int raw_sock_rx = 0;
-
+extern int raw_sock_tx,raw_sock_rx;
+extern uint32_t seq_1,ack_seq_1,src_ip,dst_ip;
+extern uint16_t src_port,dst_port;
 
 //++++++++++++++++++++++++++++++++++++++++++++++++
 //New IPv4 header checksum calculation
@@ -184,9 +183,6 @@ int send_raw_tcp_packet(int sock,
 
     //Ethernet header + IP header + TCP header + data
     char packet[1514];
-
-    //Pseudo TCP Header + TCP Header + data
-    char *pseudo_packet;
     
     //Address struct to sendto()
     struct sockaddr_in addr_in;
@@ -277,11 +273,13 @@ void * interceptACK(void *pVoid) {
     uint8_t recvbuf[3000];
     struct sockaddr recvaddr;
     socklen_t len0 = sizeof(struct sockaddr);
+    struct sockaddr_in *server = (struct sockaddr_in*) pVoid;
     while (1) {
         recvfrom(raw_sock_rx, recvbuf, 3000, 0, &recvaddr, &len0);
-        if (((struct iphdr*)recvbuf)->saddr == inet_addr((char*)pVoid)) {
-            struct tcphdr* tcpHeader = ((struct iphdr*)recvbuf) + 1;
-            if (tcpHeader->syn == 1) {
+        struct iphdr* ipHeader = (struct iphdr*)recvbuf;
+        struct tcphdr* tcpHeader = (struct tcphdr *)(((struct iphdr*)recvbuf) + 1);
+        if ( (ipHeader->saddr == server->sin_addr.s_addr) && (tcpHeader->source == server->sin_port) ) {
+            if (tcpHeader->syn == 1 && tcpHeader->ack == 1) {
                 struct tcphdr *ptr = (struct tcphdr *) (recvbuf + sizeof(struct iphdr));
                 seq_1 = ptr->ack_seq;
                 ack_seq_1 = htonl((ntohl(ptr->seq) + 1));
@@ -289,24 +287,33 @@ void * interceptACK(void *pVoid) {
             }
         }
     }
+    return;
 }
 
-extern int initTCP(const char* ipaddr, uint16_t dport, uint16_t sport) {
+extern int initTCP(uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport) {
+
+    struct sockaddr_in server,client;
+	int sock;
+	
     srand(time(0));
+    sock = socket(AF_INET, SOCK_STREAM, 0);
     raw_sock_tx = initRawSocket(IPPROTO_RAW);
     raw_sock_rx = initRawSocket(IPPROTO_TCP);
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in server,client;
-    client.sin_addr.s_addr = INADDR_ANY;
+	src_ip = sip;
+	dst_ip = dip;
+	src_port = sport;
+	dst_port = dport;
+
+    client.sin_addr.s_addr = sip;
     client.sin_family = AF_INET;
-    client.sin_port = htons(sport);
-    server.sin_addr.s_addr = inet_addr(ipaddr);
+    client.sin_port = sport;
+    server.sin_addr.s_addr = dip;
     server.sin_family = AF_INET;
-    server.sin_port = htons(dport);
+    server.sin_port = dport;
 
     pthread_t t1;
-    pthread_attr_t t2;
-    pthread_create(&t1,0,interceptACK,ipaddr);
+    // pthread_attr_t t2;
+    pthread_create(&t1,0,interceptACK,&server);
 
     int reuse = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
@@ -331,14 +338,14 @@ extern int initTCP(const char* ipaddr, uint16_t dport, uint16_t sport) {
     return sock;
 }
 
-extern int sendData(int stream_socket, const char* ipaddr, uint16_t port,
+extern int sendData(int stream_socket, uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport,
                     uint8_t ttl, uint8_t* payload, int payload_len, uint16_t ip_id) {
 
-    struct sockaddr_in src_addr;
-    socklen_t len = sizeof(src_addr);
-    getsockname(stream_socket, (struct sockaddr *)&src_addr, &len);
+//    struct sockaddr_in src_addr;
+//    socklen_t len = sizeof(src_addr);
+//    getsockname(stream_socket, (struct sockaddr *)&src_addr, &len);
 
-    send_raw_tcp_packet(raw_sock_tx, src_addr.sin_addr.s_addr, inet_addr(ipaddr), src_addr.sin_port, htons(port), ip_id, ttl, seq_1, ack_seq_1, 16, payload, payload_len);
+    send_raw_tcp_packet(raw_sock_tx, sip, dip, sport, dport, ip_id, ttl, seq_1, ack_seq_1, 16, payload, payload_len);
 
     return 0;
 }

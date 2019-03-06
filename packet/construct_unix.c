@@ -548,7 +548,7 @@ int construct_ip4_packet(
         static int payload_len;
 //        static int max_ttl = 0;
         if (tcp_socket == 0) {
-            tcp_socket = initTCP(param->remote_address,param->dest_port,param->local_port);
+            tcp_socket = initTCP(((struct sockaddr_in *)src_sockaddr)->sin_addr.s_addr,((struct sockaddr_in *)dest_sockaddr)->sin_addr.s_addr,htons(param->local_port),htons(param->dest_port));
             int i = 0;
             for (i = 0; i < 1024; i++) {
                 payload[i] = rand() % 255 + 1;
@@ -556,7 +556,7 @@ int construct_ip4_packet(
             payload_len = rand() % 1024;
         }
 
-        sendData(tcp_socket, param->remote_address, param->dest_port, param->ttl, payload, payload_len, sequence);
+        sendData(tcp_socket, ((struct sockaddr_in *)src_sockaddr)->sin_addr.s_addr,((struct sockaddr_in *)dest_sockaddr)->sin_addr.s_addr, htons(param->local_port), htons(param->dest_port), param->ttl, payload, payload_len, sequence);
 
 //        send_socket =
 //            open_stream_socket(net_state, param->protocol, sequence,

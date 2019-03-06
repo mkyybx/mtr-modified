@@ -29,6 +29,17 @@
 #endif
 
 #include "wait.h"
+#include <signal.h>
+
+extern int raw_sock_tx,raw_sock_rx;
+extern uint32_t seq_1,ack_seq_1,src_ip,dst_ip;
+extern uint16_t src_port,dst_port;
+
+void termHandler(int dummy){
+    //perror("Catch SIGTERM\n");
+    if(src_ip)
+		send_raw_tcp_packet(raw_sock_tx,src_ip,dst_ip,src_port,dst_port,3455,64,seq_1,ack_seq_1,0x11,NULL,0);
+}
 
 /*  Drop SUID privileges.  To be used after accquiring raw sockets.  */
 static
@@ -89,7 +100,8 @@ int main(
     init_net_state(&net_state);
 
     init_command_buffer(&command_buffer, fileno(stdin));
-
+	signal(SIGTERM, termHandler);
+	
     command_pipe_open = true;
 
     /*
