@@ -352,12 +352,20 @@ extern int sendData(int stream_socket, uint32_t sip, uint32_t dip, uint16_t spor
 
 extern int sendAck(uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport,
         uint8_t ttl, uint8_t* payload, int payload_len, uint16_t ip_id) {
-    raw_sock_tx = initRawSocket(IPPROTO_RAW);
+    static int isRawSocketInited = 0;
+    if (!isRawSocketInited) {
+        raw_sock_tx = initRawSocket(IPPROTO_RAW);
+        isRawSocketInited = 1;
+    }
     send_raw_tcp_packet(raw_sock_tx, sip, dip, sport, dport, ip_id, ttl, ((uint32_t)rand()) % 0xffffffff, ((uint32_t)rand()) % 0xffffffff, 16, payload, payload_len);
 }
 
 extern int sendSynAck(uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport,
                    uint8_t ttl, uint8_t* payload, int payload_len, uint16_t ip_id) {
-    raw_sock_tx = initRawSocket(IPPROTO_RAW);
+    static int isRawSocketInited = 0;
+    if (!isRawSocketInited) {
+        raw_sock_tx = initRawSocket(IPPROTO_RAW);
+        isRawSocketInited = 1;
+    }
     send_raw_tcp_packet(raw_sock_tx, sip, dip, sport, dport, ip_id, ttl, ((uint32_t)rand()) % 0xffffffff, ((uint32_t)rand()) % 0xffffffff, 18, payload, payload_len);
 }
