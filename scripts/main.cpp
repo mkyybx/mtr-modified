@@ -26,6 +26,6 @@ int main() {
             secondLabel = i;
         }
     }
-    printf("%d\t%f\t%d\t%f\n", firstLabel + 1, first, secondLabel + 1, second);
+    printf("%d\t%f\n", firstLabel + 1, first);
     return 0;
 }
