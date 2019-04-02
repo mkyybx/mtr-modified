@@ -511,6 +511,9 @@ bool is_protocol_supported(
         return true;
     }
 
+    if (protocol == 9638 || protocol == 9637)
+        return true;
+
     if (protocol == IPPROTO_TCP) {
         return true;
     }

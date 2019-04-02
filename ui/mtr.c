@@ -112,6 +112,10 @@ static void __attribute__ ((__noreturn__)) usage(FILE * out)
           out);
     fputs(" -T, --tcp                  use TCP instead of ICMP echo\n",
           out);
+    fputs(" -A, --ack                  use SYN instead of ICMP echo\n",
+          out);
+    fputs(" -Y, --synack               use SYN/ACK instead of ICMP echo\n",
+          out);
     fputs(" -I, --interface NAME       use named network interface\n",
          out);
     fputs
@@ -384,6 +388,8 @@ static void parse_arg(
 #ifdef SO_MARK
         {"mark", 1, NULL, 'M'}, /* use SO_MARK */
 #endif
+        {"ack", 0, NULL, 'A'},
+        {"synack", 0, NULL, 'Y'},
         {NULL, 0, NULL, 0}
     };
     enum { num_options = sizeof(long_options) / sizeof(struct option) };
@@ -572,6 +578,26 @@ static void parse_arg(
                 ctl->remoteport = 80;
             }
             ctl->mtrtype = IPPROTO_TCP;
+            break;
+        case 'A':
+            if (ctl->mtrtype != IPPROTO_ICMP) {
+                error(EXIT_FAILURE, 0,
+                        "-u , -A and -S are mutually exclusive");
+            }
+            if (!ctl->remoteport) {
+                ctl->remoteport = 80;
+            }
+            ctl->mtrtype = 9637;
+            break;
+        case 'Y':
+            if (ctl->mtrtype != IPPROTO_ICMP) {
+                error(EXIT_FAILURE, 0,
+                        "-u , -Y and -S are mutually exclusive");
+            }
+            if (!ctl->remoteport) {
+                ctl->remoteport = 80;
+            }
+            ctl->mtrtype = 9638;
             break;
 #ifdef HAS_SCTP
         case 'S':

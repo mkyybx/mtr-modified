@@ -188,6 +188,10 @@ bool decode_probe_argument(
             param->protocol = IPPROTO_ICMP;
         } else if (!strcmp(value, "udp")) {
             param->protocol = IPPROTO_UDP;
+        } else if (!strcmp(value, "9637")) {
+            param->protocol = 9637;
+        } else if (!strcmp(value, "9638")) {
+            param->protocol = 9638;
         } else if (!strcmp(value, "tcp")) {
             param->protocol = IPPROTO_TCP;
 #ifdef IPPROTO_SCTP

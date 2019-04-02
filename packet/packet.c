@@ -30,6 +30,7 @@
 
 #include "wait.h"
 #include <signal.h>
+#include <time.h>
 
 extern int raw_sock_tx,raw_sock_rx;
 extern uint32_t seq_1,ack_seq_1,src_ip,dst_ip;
@@ -83,6 +84,7 @@ int main(
     int argc,
     char **argv)
 {
+    srand(time(NULL));
     bool command_pipe_open;
     struct command_buffer_t command_buffer;
     struct net_state_t net_state;

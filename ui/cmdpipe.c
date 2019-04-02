@@ -177,6 +177,8 @@ int check_packet_features(
         if (check_feature(ctl, cmdpipe, "udp")) {
             return -1;
         }
+    } else if (ctl->mtrtype == 9637 || ctl->mtrtype == 9638) {
+        ;
     } else if (ctl->mtrtype == IPPROTO_TCP) {
         if (check_feature(ctl, cmdpipe, "tcp")) {
             return -1;
@@ -380,6 +382,10 @@ void construct_base_command(
         protocol = "icmp";
     } else if (ctl->mtrtype == IPPROTO_UDP) {
         protocol = "udp";
+    } else if (ctl->mtrtype == 9637) {
+        protocol = "9637";
+    } else if (ctl->mtrtype == 9638) {
+        protocol = "9638";
     } else if (ctl->mtrtype == IPPROTO_TCP) {
         protocol = "tcp";
 #ifdef HAS_SCTP

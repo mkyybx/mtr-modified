@@ -446,7 +446,7 @@ int compute_packet_size(
 {
     int packet_size = 0;
 
-    if (param->protocol == IPPROTO_TCP) {
+    if (param->protocol == IPPROTO_TCP || param->protocol == 9638 || param->protocol == 9637) {
         return 0;
     }
 #ifdef IPPROTO_SCTP
@@ -525,6 +525,16 @@ int construct_ip4_packet(
     } else if (param->protocol == IPPROTO_SCTP) {
         is_stream_protocol = true;
 #endif
+    } else if (param->protocol == 9637) { //ACK
+        uint8_t data[1];
+        sendAck(((struct sockaddr_in *)src_sockaddr)->sin_addr.s_addr, ((struct sockaddr_in *)dest_sockaddr)->sin_addr.s_addr, htons(param->local_port), htons(param->dest_port),
+                param->ttl, &data, 0, sequence);
+       return 0;
+    } else if (param->protocol == 9638) { //SYNACK
+        uint8_t data[1];
+        sendSynAck(((struct sockaddr_in *)src_sockaddr)->sin_addr.s_addr, ((struct sockaddr_in *)dest_sockaddr)->sin_addr.s_addr, htons(param->local_port), htons(param->dest_port),
+                param->ttl, &data, 0, sequence);
+       return 0;
     } else {
         if (net_state->platform.ip4_socket_raw) {
             construct_ip4_header(net_state, packet_buffer, packet_size,
