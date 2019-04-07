@@ -392,7 +392,12 @@ void handle_received_icmp4_packet(
         return;
     }
     inner_ip = (struct IPHeader *) (icmp + 1);
-
+	
+	//new+++
+	//check remote IP 
+	if ( inner_ip->daddr != ((struct sockaddr_in *) remote_addr)->sin_addr.s_addr ){
+		return;
+	}
     /*
        If we get a time exceeded, we got a response from an intermediate
        host along the path to our destination.
