@@ -550,6 +550,8 @@ void report_packet_error(
     }
 }
 
+extern uint32_t dst_ip;
+
 /*  Craft a custom ICMP packet for a network probe.  */
 void send_probe(
     struct net_state_t *net_state,
@@ -578,6 +580,9 @@ void send_probe(
         perror("gettimeofday failure");
         exit(EXIT_FAILURE);
     }
+
+	//new+++
+	dst_ip = ((struct sockaddr_in*)&probe->remote_addr)->sin_addr.s_addr;
 
     // there might be an off-by-one in the number of tries here. 
     // this is intentional.  It is no use exhausting the very last
