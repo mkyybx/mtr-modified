@@ -399,7 +399,7 @@ void handle_received_icmp4_packet(
 	//new+++
 	//check remote IP 
 	if ( inner_ip->daddr != dst_ip ){
-		fprintf(stderr,"%x %x\n",inner_ip->daddr,dst_ip);
+//		fprintf(stderr,"%x %x\n",inner_ip->daddr,dst_ip);
 		return;
 	}
 	
