@@ -223,7 +223,6 @@ bool decode_probe_argument(
            privileged binding.
          */
         if (param->local_port < 1024) {
-            param->local_port = 0;
             return false;
         }
     }
@@ -326,6 +325,7 @@ void send_probe_command(
     param.packet_size = 64;
     param.timeout = 10;
     param.is_probing_byte_order = false;
+	param.local_port = rand() % (66535 - 1024 + 1) + 1024;
 
     for (i = 0; i < command->argument_count; i++) {
         name = command->argument_name[i];
